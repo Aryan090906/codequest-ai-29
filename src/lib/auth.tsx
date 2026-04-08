@@ -48,17 +48,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signIn = async (emailOrUsername: string, password: string) => {
-    // Try signing in with email directly
-    const email = emailOrUsername.includes("@") ? emailOrUsername : `${emailOrUsername}`;
+    let email = emailOrUsername;
     
-    if (emailOrUsername.includes("@")) {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      return { error };
+    if (!emailOrUsername.includes("@")) {
+      const { data, error: lookupError } = await supabase
+        .from("profiles")
+        .select("email")
+        .eq("username", emailOrUsername)
+        .maybeSingle();
+      
+      if (lookupError || !data?.email) {
+        return { error: { message: "Username not found. Please check and try again." } };
+      }
+      email = data.email;
     }
     
-    // If username, we can't directly login with it via Supabase auth
-    // Try as email anyway
-    const { error } = await supabase.auth.signInWithPassword({ email: emailOrUsername, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error };
   };
 
