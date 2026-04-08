@@ -51,25 +51,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let email = emailOrUsername;
     
     if (!emailOrUsername.includes("@")) {
-      // Look up email by username from profiles table
       const { data, error: lookupError } = await supabase
         .from("profiles")
-        .select("id")
+        .select("email")
         .eq("username", emailOrUsername)
         .maybeSingle();
       
-      if (lookupError || !data) {
+      if (lookupError || !data?.email) {
         return { error: { message: "Username not found. Please check and try again." } };
       }
-      
-      // Get user email from auth - use the username's associated email
-      // We need to look up via auth admin, but since we can't, let's try a different approach
-      // Store email in profiles or use user metadata
-      const { data: userData } = await supabase.auth.admin?.getUserById(data.id) ?? { data: null };
-      if (!userData) {
-        return { error: { message: "Could not find account. Try logging in with your email instead." } };
-      }
-      email = (userData as any)?.user?.email ?? emailOrUsername;
+      email = data.email;
     }
     
     const { error } = await supabase.auth.signInWithPassword({ email, password });
