@@ -48,17 +48,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signIn = async (emailOrUsername: string, password: string) => {
-    // Try signing in with email directly
-    const email = emailOrUsername.includes("@") ? emailOrUsername : `${emailOrUsername}`;
+    let email = emailOrUsername;
     
-    if (emailOrUsername.includes("@")) {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      return { error };
+    if (!emailOrUsername.includes("@")) {
+      // Look up email by username from profiles table
+      const { data, error: lookupError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", emailOrUsername)
+        .maybeSingle();
+      
+      if (lookupError || !data) {
+        return { error: { message: "Username not found. Please check and try again." } };
+      }
+      
+      // Get user email from auth - use the username's associated email
+      // We need to look up via auth admin, but since we can't, let's try a different approach
+      // Store email in profiles or use user metadata
+      const { data: userData } = await supabase.auth.admin?.getUserById(data.id) ?? { data: null };
+      if (!userData) {
+        return { error: { message: "Could not find account. Try logging in with your email instead." } };
+      }
+      email = (userData as any)?.user?.email ?? emailOrUsername;
     }
     
-    // If username, we can't directly login with it via Supabase auth
-    // Try as email anyway
-    const { error } = await supabase.auth.signInWithPassword({ email: emailOrUsername, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error };
   };
 
